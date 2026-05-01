@@ -217,22 +217,6 @@
       border: 1px solid #ffc107;
       color: #856404;
     }
-    .debug-console {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.85);
-      color: #0f0;
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 11px;
-      max-width: 350px;
-      max-height: 200px;
-      overflow-y: auto;
-      display: none;
-      z-index: 9999;
-      font-family: monospace;
-    }
     @media (max-width: 768px) {
       .container { border-radius: 1rem; }
       .main-content { padding: 1rem; }
@@ -247,9 +231,6 @@
     </div>
     <div class="main-content" id="mainContent"></div>
   </div>
-  
-  <!-- 调试控制台 -->
-  <div class="debug-console" id="debugConsole"></div>
 
   <script>
     // ==================== 配置 ====================
@@ -270,28 +251,15 @@
       div.textContent = text;
       return div.innerHTML;
     }
-    
-    function showDebug(...args) {
-      const debugDiv = document.getElementById('debugConsole');
-      if (debugDiv) {
-        debugDiv.style.display = 'block';
-        const time = new Date().toLocaleTimeString();
-        debugDiv.innerHTML += `[${time}] ${args.join(' ')}<br>`;
-        debugDiv.scrollTop = debugDiv.scrollHeight;
-      }
-      console.log(...args);
-    }
 
     async function fetchData() {
       try {
-        showDebug('正在加载数据...');
         const response = await fetch(API_RAW);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         cachedData = await response.json();
-        showDebug(`✅ 数据加载成功 - 用户:${cachedData.users?.length || 0}, 商品:${cachedData.products?.length || 0}, 订单:${cachedData.orders?.length || 0}`);
         return cachedData;
       } catch (e) {
-        showDebug('❌ 获取数据失败:', e.message);
+        console.error('获取数据失败:', e);
         return cachedData;
       }
     }
@@ -300,8 +268,6 @@
       if (!githubToken) {
         throw new Error('管理员Token未配置');
       }
-      
-      showDebug(`触发工作流: ${action}`, extraInputs);
       
       const body = {
         ref: 'main',
@@ -322,15 +288,11 @@
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        showDebug(`❌ 工作流触发失败: ${response.status}`, errorText);
-        throw new Error(`操作失败 (${response.status}): ${errorText}`);
+        throw new Error(`操作失败 (${response.status})`);
       }
       
-      showDebug('✅ 工作流已触发，等待执行...');
       await new Promise(resolve => setTimeout(resolve, 6000));
       await fetchData();
-      showDebug('✅ 数据已更新');
     }
 
     // ==================== 界面渲染 ====================
@@ -380,7 +342,7 @@
               <div class="input-group" style="margin-top: 0.5rem;">
                 <input type="password" id="regToken" placeholder="请输入Token (ghp_开头)" style="font-size: 0.9rem;">
               </div>
-              <small style="color: #856404;">Token仅用于触发注册请求，不会上传到服务器</small>
+              <small style="color: #856404;">Token仅用于触发注册请求，请联系管理员获取</small>
             </div>
             <div class="input-group">
               <input type="text" id="regUsername" placeholder="用户名" autocomplete="off">
@@ -526,7 +488,7 @@
             <button class="btn btn-primary" onclick="setAdminToken()">保存Token</button>
           </div>
           <small style="color: #856404;">Token仅保存在当前浏览器中，不会上传到服务器</small>
-          <button class="btn btn-sm" onclick="refreshDataAndUI()" style="margin-left: 10px; font-size: 0.8rem;">🔄 强制刷新数据</button>
+          <button class="btn" onclick="refreshDataAndUI()" style="margin-left: 10px; font-size: 0.8rem; background: #6c757d; color: white;">🔄 强制刷新数据</button>
         </div>
         
         <div class="tabs">
@@ -572,12 +534,10 @@
         </div>
       `;
       
-      // 自动填充已保存的token
       const savedToken = sessionStorage.getItem('admin_token');
       if (savedToken) {
         document.getElementById('adminToken').value = savedToken;
         githubToken = savedToken;
-        showDebug('已恢复管理员Token');
       }
       
       renderAdminUsers();
@@ -590,7 +550,6 @@
       if (!usersList) return;
 
       await fetchData();
-      showDebug('渲染用户列表，当前用户数据：', cachedData.users);
 
       const pendingUsers = cachedData.users?.filter(u => u.status === 'pending') || [];
       const approvedUsers = cachedData.users?.filter(u => u.status === 'approved' && u.role !== 'admin') || [];
@@ -711,7 +670,6 @@
       
       githubToken = token;
       sessionStorage.setItem('admin_token', token);
-      showDebug('✅ 管理员Token已保存');
       alert('Token已保存！现在可以进行管理操作了。');
     }
 
@@ -724,7 +682,6 @@
         return;
       }
       
-      showDebug(`登录尝试: ${username}`);
       await fetchData();
       
       const user = cachedData.users.find(u => 
@@ -732,25 +689,21 @@
       );
       
       if (!user) {
-        showDebug('❌ 登录失败: 用户名或密码错误');
         alert('用户名或密码错误');
         return;
       }
       
       if (user.status !== 'approved') {
-        showDebug(`❌ 登录失败: 用户状态为 ${user.status}`);
         alert('您的账户还在审核中，请等待管理员审核通过');
         return;
       }
       
       currentUser = user;
-      showDebug(`✅ 登录成功: ${user.username} (${user.role})`);
       
       if (user.role === 'admin') {
         const savedToken = sessionStorage.getItem('admin_token');
         if (savedToken) {
           githubToken = savedToken;
-          showDebug('已恢复管理员Token');
         }
       }
       
@@ -789,7 +742,6 @@
         return;
       }
       
-      // 使用输入的token
       githubToken = regToken;
       
       await fetchData();
@@ -800,7 +752,6 @@
       }
       
       try {
-        showDebug(`注册新用户: ${username}`);
         await triggerWorkflow('register', {
           user_data: JSON.stringify({
             username: username,
@@ -819,7 +770,6 @@
         switchAuthTab('login');
       } catch (e) {
         alert('注册失败: ' + e.message);
-        showDebug('❌ 注册失败:', e.message);
       }
     }
 
@@ -994,7 +944,6 @@
 
     function logout() {
       currentUser = null;
-      showDebug('已退出登录');
       renderMainContent();
     }
 
@@ -1022,17 +971,8 @@
       allTabs.forEach(btn => btn.classList.remove('active'));
       allPanels.forEach(panel => panel.classList.remove('active'));
       
-      const tabMap = {
-        'order': 0,
-        'cart': 1,
-        'orders': 2
-      };
-      
-      const panelMap = {
-        'order': 'orderPanel',
-        'cart': 'cartPanel',
-        'orders': 'ordersPanel'
-      };
+      const tabMap = { 'order': 0, 'cart': 1, 'orders': 2 };
+      const panelMap = { 'order': 'orderPanel', 'cart': 'cartPanel', 'orders': 'ordersPanel' };
       
       if (allTabs[tabMap[tab]]) {
         allTabs[tabMap[tab]].classList.add('active');
@@ -1054,17 +994,8 @@
       allTabs.forEach(btn => btn.classList.remove('active'));
       allPanels.forEach(panel => panel.classList.remove('active'));
       
-      const tabMap = {
-        'users': 0,
-        'products': 1,
-        'orders': 2
-      };
-      
-      const panelMap = {
-        'users': 'adminUsersPanel',
-        'products': 'adminProductsPanel',
-        'orders': 'adminOrdersPanel'
-      };
+      const tabMap = { 'users': 0, 'products': 1, 'orders': 2 };
+      const panelMap = { 'users': 'adminUsersPanel', 'products': 'adminProductsPanel', 'orders': 'adminOrdersPanel' };
       
       if (allTabs[tabMap[tab]]) {
         allTabs[tabMap[tab]].classList.add('active');
@@ -1078,22 +1009,15 @@
 
     // ==================== 初始化 ====================
     async function init() {
-      showDebug('🚀 系统初始化开始...');
-      
       const savedToken = sessionStorage.getItem('admin_token');
       if (savedToken) {
         githubToken = savedToken;
-        showDebug('已恢复管理员Token');
-      } else {
-        showDebug('未找到已保存的Token');
       }
       
       try {
         await fetchData();
         renderMainContent();
-        showDebug('✅ 系统初始化完成');
       } catch (e) {
-        showDebug('❌ 初始化失败:', e.message);
         document.getElementById('mainContent').innerHTML = `
           <div class="alert alert-warning">
             <h3>⚠️ 数据加载失败</h3>
