@@ -533,44 +533,52 @@
       renderAdminOrders();
     }
 
-    function renderAdminUsers() {
-      const usersList = document.getElementById('usersList');
-      if (!usersList) return;
-      
-      const pendingUsers = cachedData.users ? cachedData.users.filter(u => u.status === 'pending') : [];
-      const approvedUsers = cachedData.users ? cachedData.users.filter(u => u.status === 'approved' && u.role !== 'admin') : [];
-      
-      usersList.innerHTML = `
-        <h3>待审核用户 (${pendingUsers.length})</h3>
-        ${pendingUsers.length === 0 ? '<p>暂无待审核用户</p>' : 
-          pendingUsers.map(user => `
-            <div class="cart-item">
-              <div>
-                <strong>${user.username}</strong>
-                <div style="color: #6c757d;">${user.nickname || '无昵称'}</div>
-              </div>
-              <div>
-                <button class="btn btn-success" onclick="approveUser('${user.userId}')">通过</button>
-                <button class="btn btn-danger" onclick="rejectUser('${user.userId}')">拒绝</button>
-              </div>
-            </div>
-          `).join('')
-        }
-        
-        <h3 style="margin-top: 1rem;">已审核用户 (${approvedUsers.length})</h3>
-        ${approvedUsers.length === 0 ? '<p>暂无用户</p>' : 
-          approvedUsers.map(user => `
-            <div class="cart-item">
-              <div>
-                <strong>${user.username}</strong>
-                <div style="color: #6c757d;">${user.nickname || '无昵称'}</div>
-              </div>
-              <button class="btn btn-danger" onclick="deleteUser('${user.userId}')">删除</button>
-            </div>
-          `).join('')
-        }
-      `;
-    }
+    async function renderAdminUsers() {
+  const usersList = document.getElementById('usersList');
+  if (!usersList) return;
+
+  // 确保数据是最新的
+  await fetchData();
+  showDebug('渲染用户列表，当前用户数据：', cachedData.users);
+
+  const pendingUsers = cachedData.users?.filter(u => u.status === 'pending') || [];
+  const approvedUsers = cachedData.users?.filter(u => u.status === 'approved' && u.role !== 'admin') || [];
+
+  let html = `<h3>待审核用户 (${pendingUsers.length})</h3>`;
+  if (pendingUsers.length === 0) {
+    html += '<p style="color: #6c757d;">暂无待审核用户（若刚注册，请等待几秒后刷新页面）</p>';
+  } else {
+    html += pendingUsers.map(user => `
+      <div class="cart-item">
+        <div>
+          <strong>${escapeHtml(user.username)}</strong>
+          <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
+        </div>
+        <div>
+          <button class="btn btn-success btn-sm" onclick="approveUser('${user.userId}')">✅ 通过</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectUser('${user.userId}')">❌ 拒绝</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  html += `<hr><h3 style="margin-top: 1rem;">已审核用户 (${approvedUsers.length})</h3>`;
+  if (approvedUsers.length === 0) {
+    html += '<p style="color: #6c757d;">暂无已审核普通用户</p>';
+  } else {
+    html += approvedUsers.map(user => `
+      <div class="cart-item">
+        <div>
+          <strong>${escapeHtml(user.username)}</strong>
+          <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.userId}')">🗑️ 删除</button>
+      </div>
+    `).join('');
+  }
+
+  usersList.innerHTML = html;
+}
 
     function renderAdminProducts() {
       const productsList = document.getElementById('productsList');
@@ -879,14 +887,42 @@
       }
     }
 
-    async function toggleProduct(productId) {
-      try {
-        await triggerWorkflow('remove_product', { target_id: productId });
-        renderAdminProducts();
-      } catch (e) {
-        alert('操作失败: ' + e.message);
-      }
-    }
+    // 替换 toggleProduct 函数
+async function toggleProduct(productId) {
+  const product = cachedData.products?.find(p => p.productId === productId);
+  if (!product) {
+    alert('商品不存在');
+    return;
+  }
+
+  if (!githubToken) {
+    alert('请先在顶部输入并保存管理员Token');
+    return;
+  }
+
+  const action = product.status === 'active' ? '下架' : '上架';
+  if (!confirm(`确定要${action}商品 "${product.name}" 吗？`)) return;
+
+  try {
+    // 统一调用 remove_product 来切换状态
+    await triggerWorkflow('remove_product', {
+      target_id: productId,  // 后端会根据此ID切换状态
+    });
+
+    alert(`商品已${action}`);
+    await refreshDataAndUI();
+  } catch (e) {
+    alert(`商品${action}失败: ${e.message}`);
+  }
+}
+
+// 新增：统一的刷新并更新UI函数
+async function refreshDataAndUI() {
+  await fetchData();
+  renderAdminProducts();
+  renderAdminOrders();
+  renderAdminUsers();
+}
 
     async function updateOrderStatus(orderId, newStatus) {
       try {
