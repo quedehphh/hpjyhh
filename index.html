@@ -217,6 +217,22 @@
       border: 1px solid #ffc107;
       color: #856404;
     }
+    .debug-console {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.85);
+      color: #0f0;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      max-width: 350px;
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+      z-index: 9999;
+      font-family: monospace;
+    }
     @media (max-width: 768px) {
       .container { border-radius: 1rem; }
       .main-content { padding: 1rem; }
@@ -231,11 +247,14 @@
     </div>
     <div class="main-content" id="mainContent"></div>
   </div>
+  
+  <!-- 调试控制台 -->
+  <div class="debug-console" id="debugConsole"></div>
 
   <script>
     // ==================== 配置 ====================
-    const GITHUB_USERNAME = 'quedehphh';  // 请替换
-    const REPO_NAME = 'hpjyhh';  // 请替换
+    const GITHUB_USERNAME = 'quedehphh';
+    const REPO_NAME = 'hpjyhh';
     
     const API_RAW = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json`;
     const DISPATCH_URL = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/actions/workflows/update-orders.yml/dispatches`;
@@ -245,15 +264,34 @@
     let cachedData = { users: [], products: [], orders: [], carts: {} };
 
     // ==================== 工具函数 ====================
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function showDebug(...args) {
+      const debugDiv = document.getElementById('debugConsole');
+      if (debugDiv) {
+        debugDiv.style.display = 'block';
+        const time = new Date().toLocaleTimeString();
+        debugDiv.innerHTML += `[${time}] ${args.join(' ')}<br>`;
+        debugDiv.scrollTop = debugDiv.scrollHeight;
+      }
+      console.log(...args);
+    }
+
     async function fetchData() {
       try {
+        showDebug('正在加载数据...');
         const response = await fetch(API_RAW);
-        if (!response.ok) throw new Error('数据加载失败');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         cachedData = await response.json();
-        console.log('数据已加载:', cachedData);
+        showDebug(`✅ 数据加载成功 - 用户:${cachedData.users?.length || 0}, 商品:${cachedData.products?.length || 0}, 订单:${cachedData.orders?.length || 0}`);
         return cachedData;
       } catch (e) {
-        console.error('获取数据失败:', e);
+        showDebug('❌ 获取数据失败:', e.message);
         return cachedData;
       }
     }
@@ -263,6 +301,8 @@
         throw new Error('管理员Token未配置');
       }
       
+      showDebug(`触发工作流: ${action}`, extraInputs);
+      
       const body = {
         ref: 'main',
         inputs: {
@@ -271,25 +311,26 @@
         }
       };
       
-      try {
-        const response = await fetch(DISPATCH_URL, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/vnd.github.v3+json',
-            'Authorization': `token ${githubToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(body)
-        });
-        
-        if (!response.ok) throw new Error(`操作失败 (${response.status})`);
-        
-        console.log('操作成功，等待数据更新...');
-        await new Promise(resolve => setTimeout(resolve, 6000));
-        await fetchData();
-      } catch (e) {
-        throw new Error('操作失败: ' + e.message);
+      const response = await fetch(DISPATCH_URL, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        showDebug(`❌ 工作流触发失败: ${response.status}`, errorText);
+        throw new Error(`操作失败 (${response.status}): ${errorText}`);
       }
+      
+      showDebug('✅ 工作流已触发，等待执行...');
+      await new Promise(resolve => setTimeout(resolve, 6000));
+      await fetchData();
+      showDebug('✅ 数据已更新');
     }
 
     // ==================== 界面渲染 ====================
@@ -334,6 +375,13 @@
             </div>
           </div>
           <div id="registerForm" class="panel">
+            <div class="token-input" style="margin-bottom: 1rem;">
+              <strong>🔐 注册需要管理员Token：</strong>
+              <div class="input-group" style="margin-top: 0.5rem;">
+                <input type="password" id="regToken" placeholder="请输入Token (ghp_开头)" style="font-size: 0.9rem;">
+              </div>
+              <small style="color: #856404;">Token仅用于触发注册请求，不会上传到服务器</small>
+            </div>
             <div class="input-group">
               <input type="text" id="regUsername" placeholder="用户名" autocomplete="off">
             </div>
@@ -399,9 +447,9 @@
       
       grid.innerHTML = activeProducts.map(product => `
         <div class="product-card">
-          <span style="display: inline-block; background: #e9ecef; padding: 0.3rem 0.8rem; border-radius: 1rem; font-size: 0.8rem;">${product.category}</span>
-          <h3>${product.name}</h3>
-          <p style="color: #6c757d;">${product.description || ''}</p>
+          <span style="display: inline-block; background: #e9ecef; padding: 0.3rem 0.8rem; border-radius: 1rem; font-size: 0.8rem;">${escapeHtml(product.category)}</span>
+          <h3>${escapeHtml(product.name)}</h3>
+          <p style="color: #6c757d;">${escapeHtml(product.description || '')}</p>
           <div class="product-price">¥${product.price.toFixed(2)}</div>
           <button class="btn btn-primary" onclick="addToCart('${product.productId}')">加入购物车</button>
         </div>
@@ -426,7 +474,7 @@
       cartItems.innerHTML = userCart.map(item => `
         <div class="cart-item">
           <div>
-            <strong>${item.productName}</strong>
+            <strong>${escapeHtml(item.productName)}</strong>
             <div style="color: #6c757d;">单价: ¥${item.price.toFixed(2)} x ${item.quantity}</div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -454,10 +502,10 @@
       ordersList.innerHTML = userOrders.reverse().map(order => `
         <div class="order-item">
           <div style="flex: 1;">
-            <div style="font-weight: 600;">订单号: ${order.orderId}</div>
+            <div style="font-weight: 600;">订单号: ${escapeHtml(order.orderId)}</div>
             <div style="color: #6c757d; font-size: 0.9rem;">${new Date(order.orderTime).toLocaleString()}</div>
             <div style="margin-top: 0.5rem;">
-              ${order.items.map(item => `${item.productName} x${item.quantity}`).join(', ')}
+              ${order.items.map(item => `${escapeHtml(item.productName)} x${item.quantity}`).join(', ')}
             </div>
           </div>
           <div style="text-align: right;">
@@ -478,6 +526,7 @@
             <button class="btn btn-primary" onclick="setAdminToken()">保存Token</button>
           </div>
           <small style="color: #856404;">Token仅保存在当前浏览器中，不会上传到服务器</small>
+          <button class="btn btn-sm" onclick="refreshDataAndUI()" style="margin-left: 10px; font-size: 0.8rem;">🔄 强制刷新数据</button>
         </div>
         
         <div class="tabs">
@@ -503,6 +552,7 @@
                 <option value="武器">武器</option>
                 <option value="防具">防具</option>
                 <option value="消耗品">消耗品</option>
+                <option value="其他">其他</option>
               </select>
             </div>
             <div class="input-group">
@@ -526,6 +576,8 @@
       const savedToken = sessionStorage.getItem('admin_token');
       if (savedToken) {
         document.getElementById('adminToken').value = savedToken;
+        githubToken = savedToken;
+        showDebug('已恢复管理员Token');
       }
       
       renderAdminUsers();
@@ -534,51 +586,50 @@
     }
 
     async function renderAdminUsers() {
-  const usersList = document.getElementById('usersList');
-  if (!usersList) return;
+      const usersList = document.getElementById('usersList');
+      if (!usersList) return;
 
-  // 确保数据是最新的
-  await fetchData();
-  showDebug('渲染用户列表，当前用户数据：', cachedData.users);
+      await fetchData();
+      showDebug('渲染用户列表，当前用户数据：', cachedData.users);
 
-  const pendingUsers = cachedData.users?.filter(u => u.status === 'pending') || [];
-  const approvedUsers = cachedData.users?.filter(u => u.status === 'approved' && u.role !== 'admin') || [];
+      const pendingUsers = cachedData.users?.filter(u => u.status === 'pending') || [];
+      const approvedUsers = cachedData.users?.filter(u => u.status === 'approved' && u.role !== 'admin') || [];
 
-  let html = `<h3>待审核用户 (${pendingUsers.length})</h3>`;
-  if (pendingUsers.length === 0) {
-    html += '<p style="color: #6c757d;">暂无待审核用户（若刚注册，请等待几秒后刷新页面）</p>';
-  } else {
-    html += pendingUsers.map(user => `
-      <div class="cart-item">
-        <div>
-          <strong>${escapeHtml(user.username)}</strong>
-          <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
-        </div>
-        <div>
-          <button class="btn btn-success btn-sm" onclick="approveUser('${user.userId}')">✅ 通过</button>
-          <button class="btn btn-danger btn-sm" onclick="rejectUser('${user.userId}')">❌ 拒绝</button>
-        </div>
-      </div>
-    `).join('');
-  }
+      let html = `<h3>待审核用户 (${pendingUsers.length})</h3>`;
+      if (pendingUsers.length === 0) {
+        html += '<p style="color: #6c757d;">暂无待审核用户（若刚注册，请点击"强制刷新数据"按钮）</p>';
+      } else {
+        html += pendingUsers.map(user => `
+          <div class="cart-item">
+            <div>
+              <strong>${escapeHtml(user.username)}</strong>
+              <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
+            </div>
+            <div>
+              <button class="btn btn-success" onclick="approveUser('${user.userId}')">✅ 通过</button>
+              <button class="btn btn-danger" onclick="rejectUser('${user.userId}')">❌ 拒绝</button>
+            </div>
+          </div>
+        `).join('');
+      }
 
-  html += `<hr><h3 style="margin-top: 1rem;">已审核用户 (${approvedUsers.length})</h3>`;
-  if (approvedUsers.length === 0) {
-    html += '<p style="color: #6c757d;">暂无已审核普通用户</p>';
-  } else {
-    html += approvedUsers.map(user => `
-      <div class="cart-item">
-        <div>
-          <strong>${escapeHtml(user.username)}</strong>
-          <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
-        </div>
-        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user.userId}')">🗑️ 删除</button>
-      </div>
-    `).join('');
-  }
+      html += `<hr><h3 style="margin-top: 1rem;">已审核用户 (${approvedUsers.length})</h3>`;
+      if (approvedUsers.length === 0) {
+        html += '<p style="color: #6c757d;">暂无已审核普通用户</p>';
+      } else {
+        html += approvedUsers.map(user => `
+          <div class="cart-item">
+            <div>
+              <strong>${escapeHtml(user.username)}</strong>
+              <div style="color: #6c757d;">昵称: ${escapeHtml(user.nickname || '无')} | ID: ${user.userId}</div>
+            </div>
+            <button class="btn btn-danger" onclick="deleteUser('${user.userId}')">🗑️ 删除</button>
+          </div>
+        `).join('');
+      }
 
-  usersList.innerHTML = html;
-}
+      usersList.innerHTML = html;
+    }
 
     function renderAdminProducts() {
       const productsList = document.getElementById('productsList');
@@ -592,8 +643,8 @@
       productsList.innerHTML = cachedData.products.map(product => `
         <div class="cart-item">
           <div>
-            <strong>${product.name}</strong>
-            <span style="margin-left: 0.5rem; font-size: 0.8rem; color: #6c757d;">[${product.category}] ${product.status === 'inactive' ? '(已下架)' : ''}</span>
+            <strong>${escapeHtml(product.name)}</strong>
+            <span style="margin-left: 0.5rem; font-size: 0.8rem; color: #6c757d;">[${escapeHtml(product.category)}] ${product.status === 'inactive' ? '(已下架)' : ''}</span>
             <div style="color: #0f3460; font-weight: 700;">¥${product.price.toFixed(2)}</div>
           </div>
           <button class="btn ${product.status === 'active' ? 'btn-warning' : 'btn-success'}" 
@@ -616,10 +667,10 @@
       allOrdersList.innerHTML = cachedData.orders.reverse().map(order => `
         <div class="order-item">
           <div style="flex: 1;">
-            <div style="font-weight: 600;">${order.orderId} - ${order.username}</div>
+            <div style="font-weight: 600;">${escapeHtml(order.orderId)} - ${escapeHtml(order.username)}</div>
             <div style="color: #6c757d; font-size: 0.9rem;">${new Date(order.orderTime).toLocaleString()}</div>
             <div style="margin-top: 0.5rem;">
-              ${order.items.map(item => `${item.productName} x${item.quantity}`).join(', ')}
+              ${order.items.map(item => `${escapeHtml(item.productName)} x${item.quantity}`).join(', ')}
             </div>
           </div>
           <div style="text-align: right;">
@@ -640,7 +691,7 @@
       const userInfo = document.getElementById('userInfo');
       if (currentUser) {
         userInfo.innerHTML = `
-          <span>${currentUser.role === 'admin' ? '👑' : '👤'} ${currentUser.username}</span>
+          <span>${currentUser.role === 'admin' ? '👑' : '👤'} ${escapeHtml(currentUser.username)}</span>
           <button class="btn" style="background: rgba(255,255,255,0.2); color: white;" onclick="logout()">退出</button>
         `;
       } else {
@@ -660,6 +711,7 @@
       
       githubToken = token;
       sessionStorage.setItem('admin_token', token);
+      showDebug('✅ 管理员Token已保存');
       alert('Token已保存！现在可以进行管理操作了。');
     }
 
@@ -672,34 +724,33 @@
         return;
       }
       
-      // 先加载最新数据
+      showDebug(`登录尝试: ${username}`);
       await fetchData();
-      
-      console.log('尝试登录:', username);
-      console.log('当前用户列表:', cachedData.users);
       
       const user = cachedData.users.find(u => 
         u.username === username && u.password === password
       );
       
       if (!user) {
+        showDebug('❌ 登录失败: 用户名或密码错误');
         alert('用户名或密码错误');
         return;
       }
       
       if (user.status !== 'approved') {
+        showDebug(`❌ 登录失败: 用户状态为 ${user.status}`);
         alert('您的账户还在审核中，请等待管理员审核通过');
         return;
       }
       
       currentUser = user;
-      console.log('登录成功:', currentUser);
+      showDebug(`✅ 登录成功: ${user.username} (${user.role})`);
       
-      // 如果是管理员，尝试恢复token
       if (user.role === 'admin') {
         const savedToken = sessionStorage.getItem('admin_token');
         if (savedToken) {
           githubToken = savedToken;
+          showDebug('已恢复管理员Token');
         }
       }
       
@@ -707,9 +758,21 @@
     }
 
     async function register() {
+      const tokenInput = document.getElementById('regToken');
+      const regToken = tokenInput.value.trim();
       const username = document.getElementById('regUsername').value.trim();
       const password = document.getElementById('regPassword').value;
       const nickname = document.getElementById('regNickname').value.trim();
+      
+      if (!regToken) {
+        alert('请输入Token（请联系管理员获取）');
+        return;
+      }
+      
+      if (!regToken.startsWith('ghp_')) {
+        alert('Token格式不正确，应该以 ghp_ 开头');
+        return;
+      }
       
       if (!username || !password) {
         alert('请填写用户名和密码');
@@ -726,7 +789,9 @@
         return;
       }
       
-      // 先加载最新数据检查用户名是否已存在
+      // 使用输入的token
+      githubToken = regToken;
+      
       await fetchData();
       
       if (cachedData.users.find(u => u.username === username)) {
@@ -734,16 +799,8 @@
         return;
       }
       
-      // 普通用户注册不需要Token，这里直接操作
-      // 但由于GitHub的限制，我们还是需要Token来触发workflow
-      // 所以这里先检查是否有Token
-      if (!githubToken) {
-        // 如果没有token，使用一个提示
-        alert('系统初始化中，请稍后再试。如果问题持续，请联系管理员。');
-        return;
-      }
-      
       try {
+        showDebug(`注册新用户: ${username}`);
         await triggerWorkflow('register', {
           user_data: JSON.stringify({
             username: username,
@@ -753,15 +810,16 @@
           })
         });
         
-        alert('注册申请已提交，请等待管理员审核通过后再登录');
+        alert('✅ 注册申请已提交，请等待管理员审核通过后再登录！');
         document.getElementById('regUsername').value = '';
         document.getElementById('regPassword').value = '';
         document.getElementById('regNickname').value = '';
+        document.getElementById('regToken').value = '';
         
-        // 切换到登录界面
         switchAuthTab('login');
       } catch (e) {
         alert('注册失败: ' + e.message);
+        showDebug('❌ 注册失败:', e.message);
       }
     }
 
@@ -824,7 +882,7 @@
       if (confirm('确认通过该用户？')) {
         try {
           await triggerWorkflow('approve_user', { target_id: userId });
-          renderAdminUsers();
+          await refreshDataAndUI();
           alert('用户审核已通过');
         } catch (e) {
           alert('操作失败: ' + e.message);
@@ -836,7 +894,7 @@
       if (confirm('确认拒绝该用户？（会删除该用户）')) {
         try {
           await triggerWorkflow('reject_user', { target_id: userId });
-          renderAdminUsers();
+          await refreshDataAndUI();
           alert('已拒绝并删除该用户');
         } catch (e) {
           alert('操作失败: ' + e.message);
@@ -848,7 +906,7 @@
       if (confirm('确认删除该用户？')) {
         try {
           await triggerWorkflow('delete_user', { target_id: userId });
-          renderAdminUsers();
+          await refreshDataAndUI();
           alert('用户已删除');
         } catch (e) {
           alert('操作失败: ' + e.message);
@@ -880,49 +938,46 @@
         document.getElementById('prodName').value = '';
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodDescription').value = '';
-        renderAdminProducts();
+        await refreshDataAndUI();
         alert('商品已上架');
       } catch (e) {
         alert('添加失败: ' + e.message);
       }
     }
 
-    // 替换 toggleProduct 函数
-async function toggleProduct(productId) {
-  const product = cachedData.products?.find(p => p.productId === productId);
-  if (!product) {
-    alert('商品不存在');
-    return;
-  }
+    async function toggleProduct(productId) {
+      const product = cachedData.products?.find(p => p.productId === productId);
+      if (!product) {
+        alert('商品不存在');
+        return;
+      }
 
-  if (!githubToken) {
-    alert('请先在顶部输入并保存管理员Token');
-    return;
-  }
+      if (!githubToken) {
+        alert('请先在顶部输入并保存管理员Token');
+        return;
+      }
 
-  const action = product.status === 'active' ? '下架' : '上架';
-  if (!confirm(`确定要${action}商品 "${product.name}" 吗？`)) return;
+      const action = product.status === 'active' ? '下架' : '上架';
+      if (!confirm(`确定要${action}商品 "${product.name}" 吗？`)) return;
 
-  try {
-    // 统一调用 remove_product 来切换状态
-    await triggerWorkflow('remove_product', {
-      target_id: productId,  // 后端会根据此ID切换状态
-    });
+      try {
+        await triggerWorkflow('remove_product', {
+          target_id: productId,
+        });
 
-    alert(`商品已${action}`);
-    await refreshDataAndUI();
-  } catch (e) {
-    alert(`商品${action}失败: ${e.message}`);
-  }
-}
+        alert(`商品已${action}`);
+        await refreshDataAndUI();
+      } catch (e) {
+        alert(`商品${action}失败: ${e.message}`);
+      }
+    }
 
-// 新增：统一的刷新并更新UI函数
-async function refreshDataAndUI() {
-  await fetchData();
-  renderAdminProducts();
-  renderAdminOrders();
-  renderAdminUsers();
-}
+    async function refreshDataAndUI() {
+      await fetchData();
+      renderAdminProducts();
+      renderAdminOrders();
+      renderAdminUsers();
+    }
 
     async function updateOrderStatus(orderId, newStatus) {
       try {
@@ -939,57 +994,120 @@ async function refreshDataAndUI() {
 
     function logout() {
       currentUser = null;
+      showDebug('已退出登录');
       renderMainContent();
     }
 
     // ==================== 标签切换 ====================
     function switchAuthTab(tab) {
-      document.querySelectorAll('.auth-section .tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.auth-section .panel').forEach(panel => panel.classList.remove('active'));
+      const allTabs = document.querySelectorAll('.auth-section .tab-btn');
+      const allPanels = document.querySelectorAll('.auth-section .panel');
       
-      event.target.classList.add('active');
-      document.getElementById(tab === 'login' ? 'loginForm' : 'registerForm').classList.add('active');
+      allTabs.forEach(btn => btn.classList.remove('active'));
+      allPanels.forEach(panel => panel.classList.remove('active'));
+      
+      if (tab === 'login') {
+        allTabs[0].classList.add('active');
+        document.getElementById('loginForm').classList.add('active');
+      } else {
+        allTabs[1].classList.add('active');
+        document.getElementById('registerForm').classList.add('active');
+      }
     }
 
     function switchUserTab(tab) {
-      document.querySelectorAll('#mainContent .tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('#mainContent .panel').forEach(panel => panel.classList.remove('active'));
+      const allTabs = document.querySelectorAll('#mainContent .tab-btn');
+      const allPanels = document.querySelectorAll('#mainContent .panel');
       
-      event.target.classList.add('active');
-      document.getElementById(tab === 'order' ? 'orderPanel' : tab === 'cart' ? 'cartPanel' : 'ordersPanel').classList.add('active');
+      allTabs.forEach(btn => btn.classList.remove('active'));
+      allPanels.forEach(panel => panel.classList.remove('active'));
+      
+      const tabMap = {
+        'order': 0,
+        'cart': 1,
+        'orders': 2
+      };
+      
+      const panelMap = {
+        'order': 'orderPanel',
+        'cart': 'cartPanel',
+        'orders': 'ordersPanel'
+      };
+      
+      if (allTabs[tabMap[tab]]) {
+        allTabs[tabMap[tab]].classList.add('active');
+      }
+      
+      const panel = document.getElementById(panelMap[tab]);
+      if (panel) {
+        panel.classList.add('active');
+      }
       
       if (tab === 'cart') renderCart();
       if (tab === 'orders') renderOrders();
     }
 
     function switchAdminTab(tab) {
-      document.querySelectorAll('#mainContent .tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('#mainContent .panel').forEach(panel => panel.classList.remove('active'));
+      const allTabs = document.querySelectorAll('#mainContent .tab-btn');
+      const allPanels = document.querySelectorAll('#mainContent .panel');
       
-      event.target.classList.add('active');
-      document.getElementById(tab === 'users' ? 'adminUsersPanel' : tab === 'products' ? 'adminProductsPanel' : 'adminOrdersPanel').classList.add('active');
+      allTabs.forEach(btn => btn.classList.remove('active'));
+      allPanels.forEach(panel => panel.classList.remove('active'));
+      
+      const tabMap = {
+        'users': 0,
+        'products': 1,
+        'orders': 2
+      };
+      
+      const panelMap = {
+        'users': 'adminUsersPanel',
+        'products': 'adminProductsPanel',
+        'orders': 'adminOrdersPanel'
+      };
+      
+      if (allTabs[tabMap[tab]]) {
+        allTabs[tabMap[tab]].classList.add('active');
+      }
+      
+      const panel = document.getElementById(panelMap[tab]);
+      if (panel) {
+        panel.classList.add('active');
+      }
     }
 
     // ==================== 初始化 ====================
     async function init() {
-      // 恢复管理员token
+      showDebug('🚀 系统初始化开始...');
+      
       const savedToken = sessionStorage.getItem('admin_token');
       if (savedToken) {
         githubToken = savedToken;
-        console.log('已恢复管理员Token');
+        showDebug('已恢复管理员Token');
       } else {
-        console.log('未找到已保存的Token，管理员需要手动输入');
+        showDebug('未找到已保存的Token');
       }
       
-      await fetchData();
-      renderMainContent();
-      
-      // 输出数据状态
-      console.log('初始化完成，数据状态:', {
-        用户数: cachedData.users ? cachedData.users.length : 0,
-        商品数: cachedData.products ? cachedData.products.length : 0,
-        订单数: cachedData.orders ? cachedData.orders.length : 0
-      });
+      try {
+        await fetchData();
+        renderMainContent();
+        showDebug('✅ 系统初始化完成');
+      } catch (e) {
+        showDebug('❌ 初始化失败:', e.message);
+        document.getElementById('mainContent').innerHTML = `
+          <div class="alert alert-warning">
+            <h3>⚠️ 数据加载失败</h3>
+            <p>无法连接到GitHub，请检查：</p>
+            <ul>
+              <li>网络连接是否正常</li>
+              <li>仓库配置是否正确</li>
+              <li>data.json 文件是否存在</li>
+            </ul>
+            <p>错误信息: ${e.message}</p>
+            <button class="btn btn-primary" onclick="location.reload()">🔄 重新加载</button>
+          </div>
+        `;
+      }
     }
 
     init();
