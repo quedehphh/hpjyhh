@@ -39,7 +39,7 @@
       "category": "防具",
       "price": 20.0,
       "description": "全新三级套装",
-      "status": "active"
+      "status": "inactive"
     },
     {
       "productId": "prod_4",
