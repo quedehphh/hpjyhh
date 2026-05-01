@@ -23,7 +23,7 @@
       "category": "武器",
       "price": 15.0,
       "description": "满配M416，压枪稳",
-      "status": "active"
+      "status": "inactive"
     },
     {
       "productId": "prod_2",
