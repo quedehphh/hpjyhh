@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=2.0">
-  <title>QUEDE Studio和平精英护航点单系统</title>
+  <title>QUEDE Studio和平点单系统</title>
   <style>
     * {
       margin: 0;
@@ -195,6 +195,28 @@
       text-align: right;
       margin: 1rem 0;
     }
+    .token-input {
+      background: #fff3cd;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ffc107;
+    }
+    .alert {
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .alert-info {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      color: #0c5460;
+    }
+    .alert-warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #856404;
+    }
     @media (max-width: 768px) {
       .container { border-radius: 1rem; }
       .main-content { padding: 1rem; }
@@ -204,7 +226,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎯 和平精英护航点单系统</h1>
+      <h1>🎯 QUEDE Studio和平精英点单系统</h1>
       <div class="user-info" id="userInfo"></div>
     </div>
     <div class="main-content" id="mainContent"></div>
@@ -212,9 +234,8 @@
 
   <script>
     // ==================== 配置 ====================
-    const GITHUB_USERNAME = 'quedehehh';  // 请替换
+    const GITHUB_USERNAME = 'quedehphh';  // 请替换
     const REPO_NAME = 'hpjyhh';  // 请替换
-    const ADMIN_PASSWORD = 'admin123';
     
     const API_RAW = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json`;
     const DISPATCH_URL = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/actions/workflows/update-orders.yml/dispatches`;
@@ -229,6 +250,7 @@
         const response = await fetch(API_RAW);
         if (!response.ok) throw new Error('数据加载失败');
         cachedData = await response.json();
+        console.log('数据已加载:', cachedData);
         return cachedData;
       } catch (e) {
         console.error('获取数据失败:', e);
@@ -238,8 +260,7 @@
 
     async function triggerWorkflow(action, extraInputs = {}) {
       if (!githubToken) {
-        alert('系统未配置，请联系管理员');
-        return;
+        throw new Error('管理员Token未配置');
       }
       
       const body = {
@@ -263,8 +284,8 @@
         
         if (!response.ok) throw new Error(`操作失败 (${response.status})`);
         
-        // 等待 Actions 执行
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log('操作成功，等待数据更新...');
+        await new Promise(resolve => setTimeout(resolve, 6000));
         await fetchData();
       } catch (e) {
         throw new Error('操作失败: ' + e.message);
@@ -305,7 +326,12 @@
               <input type="password" id="loginPassword" placeholder="密码">
             </div>
             <button class="btn btn-primary" onclick="login()">登录</button>
-            <p style="margin-top: 1rem; color: #666;">注：注册需要管理员审核通过后才能登录</p>
+            <div class="alert alert-info" style="margin-top: 1rem;">
+              <strong>💡 提示：</strong><br>
+              • 管理员账户：admin / admin123<br>
+              • 新用户注册后需等待管理员审核<br>
+              • 如无法登录，请检查账户是否已审核通过
+            </div>
           </div>
           <div id="registerForm" class="panel">
             <div class="input-group">
@@ -318,6 +344,9 @@
               <input type="text" id="regNickname" placeholder="昵称（游戏ID）">
             </div>
             <button class="btn btn-success" onclick="register()">提交注册申请</button>
+            <div class="alert alert-warning" style="margin-top: 1rem;">
+              ⚠️ 注册后需要等待管理员审核通过才能登录
+            </div>
           </div>
         </div>
       `;
@@ -325,14 +354,14 @@
 
     function renderUserPanel() {
       const mainContent = document.getElementById('mainContent');
-      const userCart = cachedData.carts[currentUser.userId] || [];
-      const userOrders = cachedData.orders.filter(o => o.userId === currentUser.userId);
+      const userCart = cachedData.carts && cachedData.carts[currentUser.userId] ? cachedData.carts[currentUser.userId] : [];
+      const userOrders = cachedData.orders ? cachedData.orders.filter(o => o.userId === currentUser.userId) : [];
       
       mainContent.innerHTML = `
         <div class="tabs">
           <button class="tab-btn active" onclick="switchUserTab('order')">🎯 点单区</button>
           <button class="tab-btn" onclick="switchUserTab('cart')">🛒 购物车 (${userCart.length})</button>
-          <button class="tab-btn" onclick="switchUserTab('orders')">📋 已下单区</button>
+          <button class="tab-btn" onclick="switchUserTab('orders')">📋 已下单区 (${userOrders.length})</button>
         </div>
         
         <div id="orderPanel" class="panel active">
@@ -361,7 +390,7 @@
       const grid = document.getElementById('productGrid');
       if (!grid) return;
       
-      const activeProducts = cachedData.products.filter(p => p.status === 'active');
+      const activeProducts = cachedData.products ? cachedData.products.filter(p => p.status === 'active') : [];
       
       if (activeProducts.length === 0) {
         grid.innerHTML = '<p>暂无可用商品</p>';
@@ -374,7 +403,7 @@
           <h3>${product.name}</h3>
           <p style="color: #6c757d;">${product.description || ''}</p>
           <div class="product-price">¥${product.price.toFixed(2)}</div>
-          <button class="btn btn-primary" onclick="addToCart('${product.productId}', '${product.name}', ${product.price})">加入购物车</button>
+          <button class="btn btn-primary" onclick="addToCart('${product.productId}')">加入购物车</button>
         </div>
       `).join('');
     }
@@ -384,7 +413,7 @@
       const cartTotal = document.getElementById('cartTotal');
       if (!cartItems) return;
       
-      const userCart = cachedData.carts[currentUser.userId] || [];
+      const userCart = cachedData.carts && cachedData.carts[currentUser.userId] ? cachedData.carts[currentUser.userId] : [];
       
       if (userCart.length === 0) {
         cartItems.innerHTML = '<p>购物车是空的</p>';
@@ -415,7 +444,7 @@
       const ordersList = document.getElementById('ordersList');
       if (!ordersList) return;
       
-      const userOrders = cachedData.orders.filter(o => o.userId === currentUser.userId);
+      const userOrders = cachedData.orders ? cachedData.orders.filter(o => o.userId === currentUser.userId) : [];
       
       if (userOrders.length === 0) {
         ordersList.innerHTML = '<p>暂无订单</p>';
@@ -442,6 +471,15 @@
     function renderAdminPanel() {
       const mainContent = document.getElementById('mainContent');
       mainContent.innerHTML = `
+        <div class="token-input" id="tokenSection">
+          <strong>🔐 管理员Token配置：</strong>
+          <div class="input-group" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+            <input type="password" id="adminToken" placeholder="请输入GitHub Token (ghp_开头)" style="flex: 1;">
+            <button class="btn btn-primary" onclick="setAdminToken()">保存Token</button>
+          </div>
+          <small style="color: #856404;">Token仅保存在当前浏览器中，不会上传到服务器</small>
+        </div>
+        
         <div class="tabs">
           <button class="tab-btn active" onclick="switchAdminTab('users')">👥 用户管理</button>
           <button class="tab-btn" onclick="switchAdminTab('products')">📦 商品管理</button>
@@ -484,6 +522,12 @@
         </div>
       `;
       
+      // 自动填充已保存的token
+      const savedToken = sessionStorage.getItem('admin_token');
+      if (savedToken) {
+        document.getElementById('adminToken').value = savedToken;
+      }
+      
       renderAdminUsers();
       renderAdminProducts();
       renderAdminOrders();
@@ -493,8 +537,8 @@
       const usersList = document.getElementById('usersList');
       if (!usersList) return;
       
-      const pendingUsers = cachedData.users.filter(u => u.status === 'pending');
-      const approvedUsers = cachedData.users.filter(u => u.status === 'approved' && u.role !== 'admin');
+      const pendingUsers = cachedData.users ? cachedData.users.filter(u => u.status === 'pending') : [];
+      const approvedUsers = cachedData.users ? cachedData.users.filter(u => u.status === 'approved' && u.role !== 'admin') : [];
       
       usersList.innerHTML = `
         <h3>待审核用户 (${pendingUsers.length})</h3>
@@ -532,6 +576,11 @@
       const productsList = document.getElementById('productsList');
       if (!productsList) return;
       
+      if (!cachedData.products || cachedData.products.length === 0) {
+        productsList.innerHTML = '<p>暂无商品</p>';
+        return;
+      }
+      
       productsList.innerHTML = cachedData.products.map(product => `
         <div class="cart-item">
           <div>
@@ -551,7 +600,7 @@
       const allOrdersList = document.getElementById('allOrdersList');
       if (!allOrdersList) return;
       
-      if (cachedData.orders.length === 0) {
+      if (!cachedData.orders || cachedData.orders.length === 0) {
         allOrdersList.innerHTML = '<p>暂无订单</p>';
         return;
       }
@@ -569,7 +618,7 @@
             <div style="font-size: 1.2rem; font-weight: 700;">¥${order.totalAmount.toFixed(2)}</div>
             <span class="status-badge status-${order.status}">${order.status}</span>
             ${order.status !== '已完成' ? `
-              <button class="btn btn-sm btn-primary" style="margin-top: 0.5rem;" 
+              <button class="btn btn-primary" style="margin-top: 0.5rem; font-size: 0.8rem;" 
                 onclick="updateOrderStatus('${order.orderId}', '${order.status === '已下单' ? '未支付' : '已完成'}')">
                 ${order.status === '已下单' ? '标记为未支付' : '标记为已完成'}
               </button>
@@ -592,6 +641,20 @@
     }
 
     // ==================== 业务逻辑 ====================
+    function setAdminToken() {
+      const tokenInput = document.getElementById('adminToken');
+      const token = tokenInput.value.trim();
+      
+      if (!token.startsWith('ghp_')) {
+        alert('Token格式不正确，应该以 ghp_ 开头');
+        return;
+      }
+      
+      githubToken = token;
+      sessionStorage.setItem('admin_token', token);
+      alert('Token已保存！现在可以进行管理操作了。');
+    }
+
     async function login() {
       const username = document.getElementById('loginUsername').value.trim();
       const password = document.getElementById('loginPassword').value;
@@ -601,18 +664,37 @@
         return;
       }
       
+      // 先加载最新数据
       await fetchData();
       
+      console.log('尝试登录:', username);
+      console.log('当前用户列表:', cachedData.users);
+      
       const user = cachedData.users.find(u => 
-        u.username === username && u.password === password && u.status === 'approved'
+        u.username === username && u.password === password
       );
       
       if (!user) {
-        alert('登录失败：用户名或密码错误，或账户未审核通过');
+        alert('用户名或密码错误');
+        return;
+      }
+      
+      if (user.status !== 'approved') {
+        alert('您的账户还在审核中，请等待管理员审核通过');
         return;
       }
       
       currentUser = user;
+      console.log('登录成功:', currentUser);
+      
+      // 如果是管理员，尝试恢复token
+      if (user.role === 'admin') {
+        const savedToken = sessionStorage.getItem('admin_token');
+        if (savedToken) {
+          githubToken = savedToken;
+        }
+      }
+      
       renderMainContent();
     }
 
@@ -626,12 +708,31 @@
         return;
       }
       
-      const savedToken = sessionStorage.getItem('gh_token');
-      if (!savedToken) {
-        const token = prompt('首次使用需要输入GitHub Token（可在设置中重新配置）：');
-        if (!token) return;
-        githubToken = token;
-        sessionStorage.setItem('gh_token', token);
+      if (username.length < 3) {
+        alert('用户名至少3个字符');
+        return;
+      }
+      
+      if (password.length < 6) {
+        alert('密码至少6个字符');
+        return;
+      }
+      
+      // 先加载最新数据检查用户名是否已存在
+      await fetchData();
+      
+      if (cachedData.users.find(u => u.username === username)) {
+        alert('该用户名已被注册');
+        return;
+      }
+      
+      // 普通用户注册不需要Token，这里直接操作
+      // 但由于GitHub的限制，我们还是需要Token来触发workflow
+      // 所以这里先检查是否有Token
+      if (!githubToken) {
+        // 如果没有token，使用一个提示
+        alert('系统初始化中，请稍后再试。如果问题持续，请联系管理员。');
+        return;
       }
       
       try {
@@ -644,16 +745,19 @@
           })
         });
         
-        alert('注册申请已提交，请等待管理员审核');
+        alert('注册申请已提交，请等待管理员审核通过后再登录');
         document.getElementById('regUsername').value = '';
         document.getElementById('regPassword').value = '';
         document.getElementById('regNickname').value = '';
+        
+        // 切换到登录界面
+        switchAuthTab('login');
       } catch (e) {
         alert('注册失败: ' + e.message);
       }
     }
 
-    async function addToCart(productId, productName, price) {
+    async function addToCart(productId) {
       if (!currentUser) {
         alert('请先登录');
         return;
@@ -713,6 +817,7 @@
         try {
           await triggerWorkflow('approve_user', { target_id: userId });
           renderAdminUsers();
+          alert('用户审核已通过');
         } catch (e) {
           alert('操作失败: ' + e.message);
         }
@@ -720,10 +825,11 @@
     }
 
     async function rejectUser(userId) {
-      if (confirm('确认拒绝该用户？')) {
+      if (confirm('确认拒绝该用户？（会删除该用户）')) {
         try {
           await triggerWorkflow('reject_user', { target_id: userId });
           renderAdminUsers();
+          alert('已拒绝并删除该用户');
         } catch (e) {
           alert('操作失败: ' + e.message);
         }
@@ -735,6 +841,7 @@
         try {
           await triggerWorkflow('delete_user', { target_id: userId });
           renderAdminUsers();
+          alert('用户已删除');
         } catch (e) {
           alert('操作失败: ' + e.message);
         }
@@ -766,22 +873,15 @@
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodDescription').value = '';
         renderAdminProducts();
+        alert('商品已上架');
       } catch (e) {
         alert('添加失败: ' + e.message);
       }
     }
 
     async function toggleProduct(productId) {
-      const product = cachedData.products.find(p => p.productId === productId);
-      if (!product) return;
-      
       try {
-        if (product.status === 'active') {
-          await triggerWorkflow('remove_product', { target_id: productId });
-        } else {
-          // 对于重新上架，我们先删除再添加
-          await triggerWorkflow('remove_product', { target_id: productId });
-        }
+        await triggerWorkflow('remove_product', { target_id: productId });
         renderAdminProducts();
       } catch (e) {
         alert('操作失败: ' + e.message);
@@ -795,6 +895,7 @@
           order_data: newStatus
         });
         renderAdminOrders();
+        alert(`订单状态已更新为: ${newStatus}`);
       } catch (e) {
         alert('状态更新失败: ' + e.message);
       }
@@ -835,13 +936,24 @@
 
     // ==================== 初始化 ====================
     async function init() {
-      const savedToken = sessionStorage.getItem('gh_token');
+      // 恢复管理员token
+      const savedToken = sessionStorage.getItem('admin_token');
       if (savedToken) {
         githubToken = savedToken;
+        console.log('已恢复管理员Token');
+      } else {
+        console.log('未找到已保存的Token，管理员需要手动输入');
       }
       
       await fetchData();
       renderMainContent();
+      
+      // 输出数据状态
+      console.log('初始化完成，数据状态:', {
+        用户数: cachedData.users ? cachedData.users.length : 0,
+        商品数: cachedData.products ? cachedData.products.length : 0,
+        订单数: cachedData.orders ? cachedData.orders.length : 0
+      });
     }
 
     init();
