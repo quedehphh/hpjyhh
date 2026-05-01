@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=2.0">
+  <title>QUEDE Studio和平精英护航点单系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', system-ui, sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 2rem;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #e94560, #c23152);
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .main-content {
+      padding: 2rem;
+    }
+    .auth-section {
+      max-width: 400px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: #f8f9fa;
+      border-radius: 1rem;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      background: #e9ecef;
+      border-radius: 2rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #495057;
+    }
+    .tab-btn.active {
+      background: #e94560;
+      color: white;
+      box-shadow: 0 5px 15px rgba(233, 69, 96, 0.3);
+    }
+    .panel {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .panel.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    .product-card {
+      background: white;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+      border: 1px solid #e9ecef;
+    }
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+    .product-card h3 {
+      color: #e94560;
+      margin-bottom: 0.5rem;
+    }
+    .product-price {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0f3460;
+      margin: 0.5rem 0;
+    }
+    .btn {
+      padding: 0.6rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin: 0.3rem;
+    }
+    .btn-primary {
+      background: #e94560;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #c23152;
+    }
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    .btn-success:hover {
+      background: #218838;
+    }
+    .btn-warning {
+      background: #ffc107;
+      color: #212529;
+    }
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+    .cart-item, .order-item {
+      background: white;
+      border-radius: 0.8rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .status-badge {
+      padding: 0.3rem 0.8rem;
+      border-radius: 2rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status-已下单 { background: #fff3cd; color: #856404; }
+    .status-未支付 { background: #f8d7da; color: #721c24; }
+    .status-已完成 { background: #d4edda; color: #155724; }
+    .admin-section {
+      background: #f8f9fa;
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-top: 1rem;
+    }
+    .input-group {
+      margin-bottom: 1rem;
+    }
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #dee2e6;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+    }
+    .total-amount {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #e94560;
+      text-align: right;
+      margin: 1rem 0;
+    }
+    @media (max-width: 768px) {
+      .container { border-radius: 1rem; }
+      .main-content { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 和平精英护航点单系统</h1>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+    <div class="main-content" id="mainContent"></div>
+  </div>
+
+  <script>
+    // ==================== 配置 ====================
+    const GITHUB_USERNAME = 'quedehehh';  // 请替换
+    const REPO_NAME = 'hpjyhh';  // 请替换
+    const ADMIN_PASSWORD = 'admin123';
+    
+    const API_RAW = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json`;
+    const DISPATCH_URL = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/actions/workflows/update-orders.yml/dispatches`;
+    
+    let githubToken = '';
+    let currentUser = null;
+    let cachedData = { users: [], products: [], orders: [], carts: {} };
+
+    // ==================== 工具函数 ====================
+    async function fetchData() {
+      try {
+        const response = await fetch(API_RAW);
+        if (!response.ok) throw new Error('数据加载失败');
+        cachedData = await response.json();
+        return cachedData;
+      } catch (e) {
+        console.error('获取数据失败:', e);
+        return cachedData;
+      }
+    }
+
+    async function triggerWorkflow(action, extraInputs = {}) {
+      if (!githubToken) {
+        alert('系统未配置，请联系管理员');
+        return;
+      }
+      
+      const body = {
+        ref: 'main',
+        inputs: {
+          action: action,
+          ...extraInputs
+        }
+      };
+      
+      try {
+        const response = await fetch(DISPATCH_URL, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': `token ${githubToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) throw new Error(`操作失败 (${response.status})`);
+        
+        // 等待 Actions 执行
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        await fetchData();
+      } catch (e) {
+        throw new Error('操作失败: ' + e.message);
+      }
+    }
+
+    // ==================== 界面渲染 ====================
+    function renderMainContent() {
+      const mainContent = document.getElementById('mainContent');
+      
+      if (!currentUser) {
+        renderAuthSection();
+        return;
+      }
+      
+      if (currentUser.role === 'admin') {
+        renderAdminPanel();
+      } else {
+        renderUserPanel();
+      }
+      
+      updateUserInfo();
+    }
+
+    function renderAuthSection() {
+      const mainContent = document.getElementById('mainContent');
+      mainContent.innerHTML = `
+        <div class="auth-section">
+          <div class="tabs">
+            <button class="tab-btn active" onclick="switchAuthTab('login')">登录</button>
+            <button class="tab-btn" onclick="switchAuthTab('register')">注册</button>
+          </div>
+          <div id="loginForm" class="panel active">
+            <div class="input-group">
+              <input type="text" id="loginUsername" placeholder="用户名" autocomplete="off">
+            </div>
+            <div class="input-group">
+              <input type="password" id="loginPassword" placeholder="密码">
+            </div>
+            <button class="btn btn-primary" onclick="login()">登录</button>
+            <p style="margin-top: 1rem; color: #666;">注：注册需要管理员审核通过后才能登录</p>
+          </div>
+          <div id="registerForm" class="panel">
+            <div class="input-group">
+              <input type="text" id="regUsername" placeholder="用户名" autocomplete="off">
+            </div>
+            <div class="input-group">
+              <input type="password" id="regPassword" placeholder="密码">
+            </div>
+            <div class="input-group">
+              <input type="text" id="regNickname" placeholder="昵称（游戏ID）">
+            </div>
+            <button class="btn btn-success" onclick="register()">提交注册申请</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderUserPanel() {
+      const mainContent = document.getElementById('mainContent');
+      const userCart = cachedData.carts[currentUser.userId] || [];
+      const userOrders = cachedData.orders.filter(o => o.userId === currentUser.userId);
+      
+      mainContent.innerHTML = `
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchUserTab('order')">🎯 点单区</button>
+          <button class="tab-btn" onclick="switchUserTab('cart')">🛒 购物车 (${userCart.length})</button>
+          <button class="tab-btn" onclick="switchUserTab('orders')">📋 已下单区</button>
+        </div>
+        
+        <div id="orderPanel" class="panel active">
+          <h2>商品列表</h2>
+          <div class="product-grid" id="productGrid"></div>
+        </div>
+        
+        <div id="cartPanel" class="panel">
+          <h2>我的购物车</h2>
+          <div id="cartItems"></div>
+          <div class="total-amount" id="cartTotal"></div>
+        </div>
+        
+        <div id="ordersPanel" class="panel">
+          <h2>我的订单</h2>
+          <div id="ordersList"></div>
+        </div>
+      `;
+      
+      renderProducts();
+      renderCart();
+      renderOrders();
+    }
+
+    function renderProducts() {
+      const grid = document.getElementById('productGrid');
+      if (!grid) return;
+      
+      const activeProducts = cachedData.products.filter(p => p.status === 'active');
+      
+      if (activeProducts.length === 0) {
+        grid.innerHTML = '<p>暂无可用商品</p>';
+        return;
+      }
+      
+      grid.innerHTML = activeProducts.map(product => `
+        <div class="product-card">
+          <span style="display: inline-block; background: #e9ecef; padding: 0.3rem 0.8rem; border-radius: 1rem; font-size: 0.8rem;">${product.category}</span>
+          <h3>${product.name}</h3>
+          <p style="color: #6c757d;">${product.description || ''}</p>
+          <div class="product-price">¥${product.price.toFixed(2)}</div>
+          <button class="btn btn-primary" onclick="addToCart('${product.productId}', '${product.name}', ${product.price})">加入购物车</button>
+        </div>
+      `).join('');
+    }
+
+    function renderCart() {
+      const cartItems = document.getElementById('cartItems');
+      const cartTotal = document.getElementById('cartTotal');
+      if (!cartItems) return;
+      
+      const userCart = cachedData.carts[currentUser.userId] || [];
+      
+      if (userCart.length === 0) {
+        cartItems.innerHTML = '<p>购物车是空的</p>';
+        cartTotal.innerHTML = '';
+        return;
+      }
+      
+      const total = userCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      
+      cartItems.innerHTML = userCart.map(item => `
+        <div class="cart-item">
+          <div>
+            <strong>${item.productName}</strong>
+            <div style="color: #6c757d;">单价: ¥${item.price.toFixed(2)} x ${item.quantity}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-weight: 700; font-size: 1.2rem;">¥${(item.price * item.quantity).toFixed(2)}</span>
+            <button class="btn btn-danger" onclick="removeFromCart('${item.productId}')">删除</button>
+          </div>
+        </div>
+      `).join('');
+      
+      cartTotal.innerHTML = `总计: ¥${total.toFixed(2)} 
+        <button class="btn btn-success" onclick="submitOrder()">提交订单</button>`;
+    }
+
+    function renderOrders() {
+      const ordersList = document.getElementById('ordersList');
+      if (!ordersList) return;
+      
+      const userOrders = cachedData.orders.filter(o => o.userId === currentUser.userId);
+      
+      if (userOrders.length === 0) {
+        ordersList.innerHTML = '<p>暂无订单</p>';
+        return;
+      }
+      
+      ordersList.innerHTML = userOrders.reverse().map(order => `
+        <div class="order-item">
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">订单号: ${order.orderId}</div>
+            <div style="color: #6c757d; font-size: 0.9rem;">${new Date(order.orderTime).toLocaleString()}</div>
+            <div style="margin-top: 0.5rem;">
+              ${order.items.map(item => `${item.productName} x${item.quantity}`).join(', ')}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 1.2rem; font-weight: 700;">¥${order.totalAmount.toFixed(2)}</div>
+            <span class="status-badge status-${order.status}">${order.status}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAdminPanel() {
+      const mainContent = document.getElementById('mainContent');
+      mainContent.innerHTML = `
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchAdminTab('users')">👥 用户管理</button>
+          <button class="tab-btn" onclick="switchAdminTab('products')">📦 商品管理</button>
+          <button class="tab-btn" onclick="switchAdminTab('orders')">📋 订单管理</button>
+        </div>
+        
+        <div id="adminUsersPanel" class="panel active">
+          <h2>用户管理</h2>
+          <div id="usersList"></div>
+        </div>
+        
+        <div id="adminProductsPanel" class="panel">
+          <h2>商品管理</h2>
+          <div class="admin-section">
+            <h3>添加新商品</h3>
+            <div class="input-group">
+              <input type="text" id="prodName" placeholder="商品名称">
+            </div>
+            <div class="input-group">
+              <select id="prodCategory">
+                <option value="武器">武器</option>
+                <option value="防具">防具</option>
+                <option value="消耗品">消耗品</option>
+              </select>
+            </div>
+            <div class="input-group">
+              <input type="number" id="prodPrice" placeholder="价格" step="0.01">
+            </div>
+            <div class="input-group">
+              <input type="text" id="prodDescription" placeholder="描述">
+            </div>
+            <button class="btn btn-primary" onclick="addProduct()">上架商品</button>
+          </div>
+          <div id="productsList" style="margin-top: 1rem;"></div>
+        </div>
+        
+        <div id="adminOrdersPanel" class="panel">
+          <h2>所有订单</h2>
+          <div id="allOrdersList"></div>
+        </div>
+      `;
+      
+      renderAdminUsers();
+      renderAdminProducts();
+      renderAdminOrders();
+    }
+
+    function renderAdminUsers() {
+      const usersList = document.getElementById('usersList');
+      if (!usersList) return;
+      
+      const pendingUsers = cachedData.users.filter(u => u.status === 'pending');
+      const approvedUsers = cachedData.users.filter(u => u.status === 'approved' && u.role !== 'admin');
+      
+      usersList.innerHTML = `
+        <h3>待审核用户 (${pendingUsers.length})</h3>
+        ${pendingUsers.length === 0 ? '<p>暂无待审核用户</p>' : 
+          pendingUsers.map(user => `
+            <div class="cart-item">
+              <div>
+                <strong>${user.username}</strong>
+                <div style="color: #6c757d;">${user.nickname || '无昵称'}</div>
+              </div>
+              <div>
+                <button class="btn btn-success" onclick="approveUser('${user.userId}')">通过</button>
+                <button class="btn btn-danger" onclick="rejectUser('${user.userId}')">拒绝</button>
+              </div>
+            </div>
+          `).join('')
+        }
+        
+        <h3 style="margin-top: 1rem;">已审核用户 (${approvedUsers.length})</h3>
+        ${approvedUsers.length === 0 ? '<p>暂无用户</p>' : 
+          approvedUsers.map(user => `
+            <div class="cart-item">
+              <div>
+                <strong>${user.username}</strong>
+                <div style="color: #6c757d;">${user.nickname || '无昵称'}</div>
+              </div>
+              <button class="btn btn-danger" onclick="deleteUser('${user.userId}')">删除</button>
+            </div>
+          `).join('')
+        }
+      `;
+    }
+
+    function renderAdminProducts() {
+      const productsList = document.getElementById('productsList');
+      if (!productsList) return;
+      
+      productsList.innerHTML = cachedData.products.map(product => `
+        <div class="cart-item">
+          <div>
+            <strong>${product.name}</strong>
+            <span style="margin-left: 0.5rem; font-size: 0.8rem; color: #6c757d;">[${product.category}] ${product.status === 'inactive' ? '(已下架)' : ''}</span>
+            <div style="color: #0f3460; font-weight: 700;">¥${product.price.toFixed(2)}</div>
+          </div>
+          <button class="btn ${product.status === 'active' ? 'btn-warning' : 'btn-success'}" 
+            onclick="toggleProduct('${product.productId}')">
+            ${product.status === 'active' ? '下架' : '上架'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderAdminOrders() {
+      const allOrdersList = document.getElementById('allOrdersList');
+      if (!allOrdersList) return;
+      
+      if (cachedData.orders.length === 0) {
+        allOrdersList.innerHTML = '<p>暂无订单</p>';
+        return;
+      }
+      
+      allOrdersList.innerHTML = cachedData.orders.reverse().map(order => `
+        <div class="order-item">
+          <div style="flex: 1;">
+            <div style="font-weight: 600;">${order.orderId} - ${order.username}</div>
+            <div style="color: #6c757d; font-size: 0.9rem;">${new Date(order.orderTime).toLocaleString()}</div>
+            <div style="margin-top: 0.5rem;">
+              ${order.items.map(item => `${item.productName} x${item.quantity}`).join(', ')}
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 1.2rem; font-weight: 700;">¥${order.totalAmount.toFixed(2)}</div>
+            <span class="status-badge status-${order.status}">${order.status}</span>
+            ${order.status !== '已完成' ? `
+              <button class="btn btn-sm btn-primary" style="margin-top: 0.5rem;" 
+                onclick="updateOrderStatus('${order.orderId}', '${order.status === '已下单' ? '未支付' : '已完成'}')">
+                ${order.status === '已下单' ? '标记为未支付' : '标记为已完成'}
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateUserInfo() {
+      const userInfo = document.getElementById('userInfo');
+      if (currentUser) {
+        userInfo.innerHTML = `
+          <span>${currentUser.role === 'admin' ? '👑' : '👤'} ${currentUser.username}</span>
+          <button class="btn" style="background: rgba(255,255,255,0.2); color: white;" onclick="logout()">退出</button>
+        `;
+      } else {
+        userInfo.innerHTML = '';
+      }
+    }
+
+    // ==================== 业务逻辑 ====================
+    async function login() {
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      
+      if (!username || !password) {
+        alert('请输入用户名和密码');
+        return;
+      }
+      
+      await fetchData();
+      
+      const user = cachedData.users.find(u => 
+        u.username === username && u.password === password && u.status === 'approved'
+      );
+      
+      if (!user) {
+        alert('登录失败：用户名或密码错误，或账户未审核通过');
+        return;
+      }
+      
+      currentUser = user;
+      renderMainContent();
+    }
+
+    async function register() {
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const nickname = document.getElementById('regNickname').value.trim();
+      
+      if (!username || !password) {
+        alert('请填写用户名和密码');
+        return;
+      }
+      
+      const savedToken = sessionStorage.getItem('gh_token');
+      if (!savedToken) {
+        const token = prompt('首次使用需要输入GitHub Token（可在设置中重新配置）：');
+        if (!token) return;
+        githubToken = token;
+        sessionStorage.setItem('gh_token', token);
+      }
+      
+      try {
+        await triggerWorkflow('register', {
+          user_data: JSON.stringify({
+            username: username,
+            password: password,
+            nickname: nickname || username,
+            role: 'user'
+          })
+        });
+        
+        alert('注册申请已提交，请等待管理员审核');
+        document.getElementById('regUsername').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('regNickname').value = '';
+      } catch (e) {
+        alert('注册失败: ' + e.message);
+      }
+    }
+
+    async function addToCart(productId, productName, price) {
+      if (!currentUser) {
+        alert('请先登录');
+        return;
+      }
+      
+      try {
+        await triggerWorkflow('add_to_cart', {
+          item_data: JSON.stringify({
+            userId: currentUser.userId,
+            productId: productId,
+            quantity: 1
+          })
+        });
+        
+        renderCart();
+      } catch (e) {
+        alert('添加失败: ' + e.message);
+      }
+    }
+
+    async function removeFromCart(productId) {
+      try {
+        await triggerWorkflow('remove_from_cart', {
+          item_data: JSON.stringify({
+            userId: currentUser.userId,
+            productId: productId
+          })
+        });
+        
+        renderCart();
+      } catch (e) {
+        alert('删除失败: ' + e.message);
+      }
+    }
+
+    async function submitOrder() {
+      if (confirm('确认提交订单？')) {
+        try {
+          await triggerWorkflow('submit_order', {
+            order_data: JSON.stringify({
+              userId: currentUser.userId,
+              username: currentUser.username
+            })
+          });
+          
+          alert('订单已提交，请等待处理');
+          renderCart();
+          renderOrders();
+        } catch (e) {
+          alert('提交失败: ' + e.message);
+        }
+      }
+    }
+
+    async function approveUser(userId) {
+      if (confirm('确认通过该用户？')) {
+        try {
+          await triggerWorkflow('approve_user', { target_id: userId });
+          renderAdminUsers();
+        } catch (e) {
+          alert('操作失败: ' + e.message);
+        }
+      }
+    }
+
+    async function rejectUser(userId) {
+      if (confirm('确认拒绝该用户？')) {
+        try {
+          await triggerWorkflow('reject_user', { target_id: userId });
+          renderAdminUsers();
+        } catch (e) {
+          alert('操作失败: ' + e.message);
+        }
+      }
+    }
+
+    async function deleteUser(userId) {
+      if (confirm('确认删除该用户？')) {
+        try {
+          await triggerWorkflow('delete_user', { target_id: userId });
+          renderAdminUsers();
+        } catch (e) {
+          alert('操作失败: ' + e.message);
+        }
+      }
+    }
+
+    async function addProduct() {
+      const name = document.getElementById('prodName').value.trim();
+      const category = document.getElementById('prodCategory').value;
+      const price = parseFloat(document.getElementById('prodPrice').value);
+      const description = document.getElementById('prodDescription').value.trim();
+      
+      if (!name || isNaN(price) || price <= 0) {
+        alert('请填写商品名称和有效价格');
+        return;
+      }
+      
+      try {
+        await triggerWorkflow('add_product', {
+          item_data: JSON.stringify({
+            name: name,
+            category: category,
+            price: price,
+            description: description
+          })
+        });
+        
+        document.getElementById('prodName').value = '';
+        document.getElementById('prodPrice').value = '';
+        document.getElementById('prodDescription').value = '';
+        renderAdminProducts();
+      } catch (e) {
+        alert('添加失败: ' + e.message);
+      }
+    }
+
+    async function toggleProduct(productId) {
+      const product = cachedData.products.find(p => p.productId === productId);
+      if (!product) return;
+      
+      try {
+        if (product.status === 'active') {
+          await triggerWorkflow('remove_product', { target_id: productId });
+        } else {
+          // 对于重新上架，我们先删除再添加
+          await triggerWorkflow('remove_product', { target_id: productId });
+        }
+        renderAdminProducts();
+      } catch (e) {
+        alert('操作失败: ' + e.message);
+      }
+    }
+
+    async function updateOrderStatus(orderId, newStatus) {
+      try {
+        await triggerWorkflow('update_order_status', {
+          target_id: orderId,
+          order_data: newStatus
+        });
+        renderAdminOrders();
+      } catch (e) {
+        alert('状态更新失败: ' + e.message);
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      renderMainContent();
+    }
+
+    // ==================== 标签切换 ====================
+    function switchAuthTab(tab) {
+      document.querySelectorAll('.auth-section .tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.auth-section .panel').forEach(panel => panel.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab === 'login' ? 'loginForm' : 'registerForm').classList.add('active');
+    }
+
+    function switchUserTab(tab) {
+      document.querySelectorAll('#mainContent .tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('#mainContent .panel').forEach(panel => panel.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab === 'order' ? 'orderPanel' : tab === 'cart' ? 'cartPanel' : 'ordersPanel').classList.add('active');
+      
+      if (tab === 'cart') renderCart();
+      if (tab === 'orders') renderOrders();
+    }
+
+    function switchAdminTab(tab) {
+      document.querySelectorAll('#mainContent .tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('#mainContent .panel').forEach(panel => panel.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tab === 'users' ? 'adminUsersPanel' : tab === 'products' ? 'adminProductsPanel' : 'adminOrdersPanel').classList.add('active');
+    }
+
+    // ==================== 初始化 ====================
+    async function init() {
+      const savedToken = sessionStorage.getItem('gh_token');
+      if (savedToken) {
+        githubToken = savedToken;
+      }
+      
+      await fetchData();
+      renderMainContent();
+    }
+
+    init();
+  </script>
+</body>
+</html>
